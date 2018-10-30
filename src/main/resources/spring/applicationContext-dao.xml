@@ -1,0 +1,115 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:jee="http://www.springframework.org/schema/jee"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd 
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.2.xsd 
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-3.2.xsd 
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.2.xsd
+		http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-3.2.xsd"
+		default-autowire="byName" default-lazy-init="false">
+
+	<!-- 加载jdbc.properties文件中的内容，文件中key命名要有一定的特殊规则 -->
+	<!-- 1.非加密方式加载资源文件 -->
+	<!-- <context:property-placeholder location="classpath:jdbc.properties" file-encoding="utf-8" /> -->
+	<!-- <context:property-placeholder location="classpath:jdbc.properties" /> -->
+	<!-- 2.加密方式加载资源文件 -->
+	<bean id="environmentVariablesConfiguration" class="org.jasypt.encryption.pbe.config.EnvironmentStringPBEConfig">
+		<property name="algorithm" value="PBEWithMD5AndDES" />
+		<property name="password" value="PBEWithMD5AndDES" />
+	</bean>
+	<bean id="configurationEncryptor" class="org.jasypt.encryption.pbe.StandardPBEStringEncryptor">
+		<property name="config" ref="environmentVariablesConfiguration" />
+	</bean>
+	<bean id="propertyConfigurer" class="org.jasypt.spring3.properties.EncryptablePropertyPlaceholderConfigurer">
+		<constructor-arg ref="configurationEncryptor" />
+		<property name="locations">
+			<list>
+				<value>classpath:jdbc.properties</value>
+				<!-- 
+				<value>classpath:ldap.properties</value>
+				<value>classpath:config.properties</value>
+				<value>classpath:staticResource.properties</value>
+				 -->
+			</list>
+		</property>
+		<property name="fileEncoding" value="utf-8" />
+	</bean>
+	
+	<!-- 1.JNDI数据源配置方式 -->
+	<!-- 
+	<jee:jndi-lookup id="dataSource" jndi-name="ds_ssm"/>
+	 -->
+	<!-- 2.配置数据源 ，dbcp2 -->
+	<!-- 
+	<bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+		<property name="driverClassName" value="${jdbc.driver}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+	</bean>
+	 -->
+	<!-- 3.配置数据源 ，bonecp -->
+	<bean id="baseDataSource" class="com.jolbox.bonecp.BoneCPDataSource" destroy-method="close">
+		<property name="idleConnectionTestPeriodInSeconds" value="${idleConnectionTestPeriodInSeconds}" /><!-- 设置测试connection的间隔时间 -->
+		<property name="idleMaxAgeInSeconds" value="${idleMaxAgeInSeconds}" /><!-- 设置connection的空闲存活时间,和idleConnectionTestPeriod搭配使用 -->
+		<property name="maxConnectionsPerPartition" value="${maxConnectionsPerPartition}" /><!-- 设置每个分区含有connection最大个数，如果小于2，BoneCP将设置为50 -->
+		<property name="minConnectionsPerPartition" value="${minConnectionsPerPartition}" /><!-- 设置每个分区含有connection最小个数。这个参数默认为0。 -->
+		<property name="partitionCount" value="${partitionCount}" /><!-- 设置分区个数。这个参数默认为1，建议3-4（根据特定应用程序而定）。 -->
+		<property name="acquireIncrement" value="${acquireIncrement}" /><!-- 设置分区中的connection增长数量。这个参数默认为1。 -->
+		<property name="statementsCacheSize" value="${statementsCacheSize}" /><!-- 设置statement缓存个数。这个参数默认为0。 -->
+		<property name="releaseHelperThreads" value="${releaseHelperThreads}" /><!-- 设置connection助手线程个数。这个参数默认为3。如果小于0，BoneCP将设置为3。 -->
+		<property name="acquireRetryDelayInMs" value="${acquireRetryDelayInMs}" /><!-- 在获取连接失败后，第二次参试前的延迟时间，默认为7000毫秒。 -->
+		<property name="acquireRetryAttempts" value="${acquireRetryAttempts}" /><!-- 在获取连接失败后的重试次数，默认为5次 -->
+		<property name="closeConnectionWatch" value="${closeConnectionWatch}" /><!-- 设置增加一个线程监控关闭连接时的情况，如果关闭时出现异常，则打出错误日志。用于debug，上线后需要关掉 -->
+		<property name="logStatementsEnabled" value="${logStatementsEnabled}" /><!-- 设置打印执行的SQL语句，如果使用其它打印SQL语句的框架，此处可以关闭。用于debug，上线后需要关掉 -->
+		<property name="connectionTestStatement" value="${connectionTestStatement}" />
+	</bean>
+	<bean id="dataSource" parent="baseDataSource" p:jdbcUrl="${jdbcUrl}" p:username="${jdbcUsername}" p:password="${jdbcPassword}" p:driverClass="${driverClass}" />
+	<bean id="dataSourceSlave" parent="baseDataSource" p:jdbcUrl="${jdbcUrlSlave}" p:username="${jdbcUsernameSlave}" p:password="${jdbcPasswordSlave}" p:driverClass="${driverClass}" />
+	
+	<!-- sqlSessionFactory -->
+	<bean id="mySqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!-- 数据库连接池 -->
+		<property name="dataSource" ref="dataSource" />
+		<!-- 加载mybatis的全局配置文件 -->
+		<property name="configLocation" value="classpath:mybatis/sqlMapConfig.xml" />
+		<!-- 自动批量扫描所有JavaBean别名，省掉sqlMapConfig.xml里手工配置typeAliases信息 -->
+		<property name="typeAliasesPackage" value="org.bluesky.ssm.po,org.bluesky.ssm.po.auto"></property>
+		<!-- 插件配置，省掉sqlMapConfig.xml里手工配置plugins信息 -->
+		<property name="plugins">
+			<array>
+				<bean class="com.github.pagehelper.PageHelper">
+					<property name="properties">
+						<value>dialect=hsqldb</value>
+					</property>
+				</bean>
+			</array>
+		</property>
+		<!-- 自动扫描所有SQL映射的xml文件，省掉sqlMapConfig.xml里手工配置mapper信息 -->
+		<!-- 第一种配置多个Mapper映射文件夹方式 -->
+		<!--
+		<property name="mapperLocations" value="classpath:org/bluesky/ssm/mapper/**/*Mapper.xml" />
+        -->
+		<!-- 第二种配置多个Mapper映射文件夹方式 -->
+		<property name="mapperLocations">
+			<list>
+                <value>classpath:org/bluesky/ssm/mapper/**/*Mapper.xml</value>
+            </list>
+        </property>
+	</bean>
+	
+	<!-- mapper扫描器 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<!-- basePackage指定要扫描的包（存放接口），在此包及子包之下的映射器都会被搜索到。可指定多个包，包与包之间用逗号或分号分隔 -->
+		<!-- <property name="basePackage" value="org.bluesky.ssm.dao,org.bluesky.ssm.dao.auto"></property> -->
+		<property name="basePackage" value="org.bluesky.ssm.dao" />
+		<property name="sqlSessionFactoryBeanName" value="mySqlSessionFactory" />
+	</bean>
+	
+</beans>

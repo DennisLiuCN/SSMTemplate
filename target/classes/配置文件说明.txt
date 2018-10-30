@@ -1,0 +1,9 @@
+org.bluesky.springmvc
+springmvc的代码
+此包中类的配置使用配置文件spring/springmvc_base.xml
+
+org.bluesky.ssm
+spring MVC与Mybatis整合的代码
+此包中类的配置使用配置文件spring/springmvc.xml、spring/applicationContext-dao.xml、
+spring/applicationContext-service.xml、spring/applicationContext-transaction.xml、
+mybatis/sqlMapConfig.xml

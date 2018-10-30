@@ -1,0 +1,48 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd 
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.2.xsd">
+		
+	<!-- 商品管理的service -->
+	<!--
+	<bean id="itemsService" class="org.bluesky.ssm.service.impl.ItemsServiceImpl" />
+	-->
+	<!-- 对于注解的service使用组件扫描生成bean
+		  包及其递归子包中的所有类都会被扫描生成bean，多个包之间用“,”分隔 -->
+	<context:component-scan base-package="org.bluesky.ssm.service.impl" />
+	
+	
+	<!-- 国际化资源配置：不集成FreeMarker时的配置方式 -->
+	<!-- 注意：如果此配置放在springmvc.xml文件中，JSP文件引用时会报异常javax.servlet.jsp.JspTagException: No message found under code 'xxx' for locale 'zh_CN' -->
+	<!-- 配置国际化资源文件路径 -->
+	<bean id="messageSource" class="org.springframework.context.support.ResourceBundleMessageSource">
+		<property name="basenames">
+			<!-- 定义消息资源文件的相对路径 -->
+	        <list>
+				<value>i18n/message</value>
+	        </list>
+		</property>
+	</bean>
+	<!-- 配置本地化解析器方式1：基于Cookie的本地化解析器 -->
+	<bean id="localeResolver" class="org.springframework.web.servlet.i18n.CookieLocaleResolver">
+		<property name="defaultLocale" value="zh_CN" />
+		<property name="cookieMaxAge" value="604800" />
+		<property name="cookieName" value="Language"></property>
+	</bean>
+	<!-- 配置本地化解析器方式2：基于Session的本地化解析器 -->
+	<!--
+	<bean id="localeResolver" class="org.springframework.web.servlet.i18n.SessionLocaleResolver" />
+    	<property name="defaultLocale" value="zh_CN" />
+	</bean>
+	-->
+	<!-- 页面使用规则：
+		  页面引入：spring标签库<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+		  页面使用：<spring:message code="welcome"></spring:message>
+		  占位符使用：<spring:message code="welcome" arguments="Dennis,My New World" argumentSeparator=","></spring:message> -->
+	<!-- 注意SessionLocaleResolver和CookieLocaleResolver的区别，很显然，通过Session只能对当前的会话有效，Cookie则对Cookie有效期内的会话都有效。
+		  在使用Cookie的时候，需要设置Cookie的过期时间，否则关闭浏览器之后，Cookie即失效了，没有达到目的。
+		  当然，也可以保存用户的语言设置信息到数据库，用户登录之后即可将语言改变成用户设置的语言。 -->
+
+</beans>

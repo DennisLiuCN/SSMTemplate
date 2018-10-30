@@ -1,0 +1,571 @@
+========================================================================================================================================================
+一、通过RequestMapping注解可以定义不同的处理器映射规则
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+1.URL路径映射
+在Controller类的方法上添加@RequestMapping(url)指定方法的URL访问路径
+例如：@RequestMapping(value="/item")或@RequestMapping("/item)
+value的值是数组，可以将多个url映射到同一个方法
+例如：@RequestMapping(value={"/item","/items"})
+
+2.窄化请求映射
+在class上添加@RequestMapping(url)指定通用请求前缀， 限制此类下的所有方法请求url必须以请求前缀开头，通过此方法对url进行分类管理，
+如果url请求与处于窄化的class中，则请求时不需要加请求前缀。
+@RequestMapping放在类名上边，设置请求前缀，如下：
+@Controller
+@RequestMapping("/item")
+@RequestMapping放在方法名上边，设置请求映射url，如下：
+@RequestMapping("/queryItem")
+访问地址为：/item/queryItem
+
+3.请求方法限定
+限定GET方法
+@RequestMapping(method = RequestMethod.GET)
+限定POST方法
+@RequestMapping(method = RequestMethod.POST)
+GET和POST都可以
+@RequestMapping(method={RequestMethod.GET,RequestMethod.POST})
+例如：@RequestMapping(value="/editItems",method={RequestMethod.POST,RequestMethod.GET})
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+二、Controller方法返回值
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+1.返回ModelAndView
+Controller方法中定义ModelAndView对象并返回，对象中可添加model数据、指定view，例如：
+	//返回ModelAndView
+	ModelAndView modelAndView = new ModelAndView();
+	或
+	ModelAndView modelAndView = new ModelAndView("items/itemsList");
+	//相当于request的setAttribut，在jsp页面中通过itemsList取数据
+	modelAndView.addObject("itemsList", itemsList);
+	//指定视图
+	modelAndView.setViewName("items/itemsList");
+	return modelAndView;
+
+2.返回string
+如果controller方法返回string：
+	1).逻辑视图名
+	controller方法返回字符串可以指定逻辑视图名，通过视图解析器解析为物理视图地址，例如：
+	//指定逻辑视图名，经过视图解析器解析为jsp物理路径：/WEB-INF/jsp/item/editItem.jsp
+	return "item/editItem";
+	
+	2).redirect重定向
+	Contrller方法返回结果重定向到一个url地址，例如：
+	//重定向到queryItem.action地址,request无法带过去
+	return "redirect:queryItem.action";
+	特点：redirect方式相当于“response.sendRedirect()”，转发后浏览器的地址栏变为转发后的地址，因为转发即执行了一个新的request和response，即无法实现request和response的共享。
+		   由于新发起一个request原来的参数在转发时就不能传递到下一个url，如果要传参数可以/item/queryItem.action后边加参数，如下：/item/queryItem?...&…..
+
+	
+	3).forward页面转发
+	controller方法执行后继续执行另一个controller方法，例如：
+	//结果转发到editItem.action，request可以带过去
+	return "forward:editItem.action";
+	特点：forward方式相当于“request.getRequestDispatcher().forward(request,response)”，转发后浏览器地址栏还是原来的地址。
+		   转发并没有执行新的request和response，而是和转发前的请求共用一个request和response。所以转发前请求的参数在转发后仍然可以读取到。
+
+
+3.返回void
+在controller方法形参上可以定义request和response，使用request或response指定响应结果：
+	1).通过response页面重定向：
+	response.sendRedirect("url");
+	
+	2).使用request转向页面，如下：
+	request.getRequestDispatcher("页面路径").forward(request, response);
+	
+	3).通过response指定响应结果，例如响应json数据如下：
+	response.setCharacterEncoding("utf-8");
+	response.setContentType("application/json;charset=utf-8");
+	response.getWriter().write("json串");
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+三、参数绑定
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+处理器适配器调用springmvc提供的参数绑定组件将key/value数据转成controller方法的形参。
+参数绑定组件：
+早期springmvc版本采用属性编辑器PropertyEditor（只能将字符串传成java对象）进行参数绑定，将request请求的参数绑定到方法形参上，
+3.X之后的springmvc开始使用转换器Converter（进行任意类型的传换）进行参数绑定。
+spirngmvc提供了很多converter，在特殊情况下需要自定义converter，对日期数据绑定需要自定义converter。
+
+1.默认支持的参数类型
+处理器Controller方法的形参中添加如下类型的参数，处理适配器会默认识别并进行赋值，方法中可以直接使用这些对象。
+	1).HttpServletRequest
+	通过request对象获取请求信息
+	
+	2).HttpServletResponse
+	通过response处理响应信息
+
+	3).HttpSession
+	通过session对象得到session中存放的对象
+
+	4).Model/ModelMap
+	ModelMap是Model接口的实现类，通过Model或ModelMap向页面传递数据，如下：
+		//调用service查询商品信息
+		Items item = itemService.findItemById(id);
+		model.addAttribute("item", item);
+	页面通过${item.XXXX}获取item对象的属性值。
+	使用Model和ModelMap的效果一样，如果直接使用Model，springmvc会实例化ModelMap。
+	
+2.简单类型
+当请求的参数名称和处理器形参名称一致时会将请求参数与形参进行绑定。
+	1).整型、字符串、单精度/双精度
+	例如：public String editItem(Model model, Integer id) throws Exception
+	处理器Controller的editItem方法中的参数id会默认识别传递的name为id的实参
+	
+	2).布尔型
+	处理器方法：public String editItem(Model model, Integer id, Boolean status) throws Exception
+	请求url：http://localhost:8080/SSM/item/editItem.action?id=2&status=false
+	说明：对于布尔类型的参数，请求的参数值为true或false。
+	
+	3).@RequestParam
+	使用@RequestParam常用于处理简单类型的绑定。
+	属性说明：
+		value：参数名字，即入参的请求参数名字，如value=“id”表示请求参数中的名字为id的参数的值将传入，否则将报：HTTP Status 400 - Required Integer parameter 'id' is not present；
+		required：是否必须，默认是true，表示请求中一定要有相应的参数，否则将报：HTTP Status 400 - Required Integer parameter 'XXXX' is not present；
+		defaultValue：默认值，表示如果请求中没有同名参数时的默认值。
+	定义如下：
+		public String editItem(@RequestParam(value="id",required=true) String item_id) {
+		}
+		形参名称为item_id，但是这里使用value="id"限定请求的参数名为id，所以页面传递参数的名必须为id。
+		这里通过required=true限定id参数为必需传递，如果不传递则报400错误，可以使用defaultvalue设置默认值，即使required=true也可以不传id参数值
+
+3.自定义类型
+	1).简单自定义类型
+	请求的参数名称和pojo的属性名称一致，会自动将请求参数赋值给pojo的属性。
+	例如：
+		页面定义如下：
+		<input type="text" name="name"/>
+		<input type="text" name="price"/>
+		Contrller方法定义如下：
+		@RequestMapping("/editItemSubmit")
+		public String editItemSubmit(Items items) throws Exception {
+			System.out.println(items);
+		}
+	
+	2).包装自定义类型
+	如果采用类似struts中对象.属性的方式命名，需要将pojo对象作为一个包装对象的属性，action中以该包装对象作为形参。
+	例如：
+		包装对象定义如下：
+		Public class QueryVo {
+			private Items items;
+		}
+		页面定义：
+		<input type="text" name="items.name" />
+		<input type="text" name="items.price" />
+		Controller方法定义如下：
+		public String useraddsubmit(Model model, QueryVo queryVo) throws Exception {
+			System.out.println(queryVo.getItems());
+		}
+	
+4.集合类型
+	1).字符串数组
+	页面定义如下：页面选中多个checkbox向controller方法传递
+		<input type="checkbox" name="item_id" value="001"/>
+		<input type="checkbox" name="item_id" value="002"/>
+		<input type="checkbox" name="item_id" value="002"/>
+	传递到controller方法中的格式是：001,002,003
+	Controller方法中可以用String[]接收，定义如下：
+		public String deleteitem(String[] item_id)throws Exception{
+			System.out.println(item_id);
+		}
+	可以用在批量删除中。
+	
+	2).List
+	List中存放对象，并将定义的List放在包装类中，action使用包装对象接收。
+	List中对象：成绩对象
+		Public class QueryVo {
+			Private List<Items> itemList;//商品列表
+			//get/set方法..
+		}
+	包装类中定义List对象，并添加get/set方法
+	页面定义如下：
+		<tr>
+			<td><input type="text" name=" itemsList[0].id" value="${item.id}"/></td>
+			<td><input type="text" name=" itemsList[0].name" value="${item.name }"/></td>
+			<td><input type="text" name=" itemsList[0].price" value="${item.price}"/></td>
+		</tr>
+		<tr>
+			<td><input type="text" name=" itemsList[1].id" value="${item.id}"/></td>
+			<td><input type="text" name=" itemsList[1].name" value="${item.name }"/></td>
+			<td><input type="text" name=" itemsList[1].price" value="${item.price}"/></td>
+		</tr>
+	上边的静态代码改为动态jsp代码如下：
+		<c:forEach items="${itemsList }" var="item" varStatus="s">
+		<tr>
+			<td><input type="text" name="itemsList[${s.index }].id" value="${item.id }"/></td>
+			<td><input type="text" name="itemsList[${s.index }].name" value="${item.name }"/></td>
+			<td><input type="text" name="itemsList[${s.index }].price" value="${item.price }"/></td>
+		</tr>
+		</c:forEach>
+	Contrller方法定义如下：
+		public String useraddsubmit(Model model,QueryVo queryVo)throws Exception{
+			System.out.println(queryVo.getItemList());
+		}
+	
+	3).Map
+	在包装类中定义Map对象，并添加get/set方法，action使用包装对象接收。
+	包装类中定义Map对象如下：
+		Public class QueryVo {
+			private Map<String, Object> itemInfo = new HashMap<String, Object>();
+			//get/set方法..
+		}
+	页面定义如下：
+		<tr>
+			<td>商品信息：</td>
+			<td>
+				商品名称：<inputtype="text"name="itemInfo['name']"/>
+				商品价格：<inputtype="text"name="itemInfo['price']"/>
+				.. .. ..
+			</td>
+		</tr>
+	Contrller方法定义如下：
+		public String useraddsubmit(Model model,QueryVo queryVo)throws Exception{
+			System.out.println(queryVo.getStudentinfo());
+		}
+		
+5.自定义参数绑定
+	参考org.bluesky.springmvc.controller.converter.CustomDateConverter及配置文件config/spring/springmvc_base.xml
+	
+6.其他类型参数绑定
+	@PathVariable绑定URI模板变量值；
+	@CookieValue绑定Cookie数据值；
+	@RequestHeader绑定请求头数据
+	例如：
+		@RequestMapping(value = "/getItem/{id}", method = RequestMethod.GET)
+		public ModelAndView getItem(@PathVariable Integer id) {
+		}
+		或
+		@RequestMapping(value = "/getItem/{itemId}", method = RequestMethod.GET)
+		public ModelAndView getItem(@PathVariable("itemId") Integer id) {
+		}
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+四、数据回显
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+1.简单数据类型
+对于简单数据类型，如：Integer、String、Float等使用Model将传入的参数再放到request域实现显示。
+如下：
+	@RequestMapping(value="/editItems",method={RequestMethod.GET})
+	public String editItems(Model model, Integer id) throws Exception {
+		//传入的id重新放到request域
+		model.addAttribute("id", id);
+	}
+	
+2.自定义类型
+springmvc默认支持pojo数据回显，springmvc自动将形参中的pojo重新放回request域中，request的key为pojo的类名（首字母小写）。
+如下：
+controller方法：
+	@RequestMapping("/editItemSubmit")
+	public String editItemSubmit(Integer id, ItemsCustom itemsCustom) throws Exception {
+springmvc自动将itemsCustom放回request，相当于调用下边的代码：model.addAttribute("itemsCustom", itemsCustom);
+jsp页面从“itemsCustom”中取数据：
+	<tr>
+		<td>商品名称：</td>
+		<td><input type="text" name="name" value="${itemsCustom.name}" /></td>
+		<td>商品价格：</td>
+		<td><input type="text" name="price" value="${itemsCustom.price}" /></td>
+	</tr>
+	
+如果key不是pojo的类名(首字母小写)，可以使用@ModelAttribute完成数据回显。
+@ModelAttribute作用如下：
+	1).绑定请求参数到pojo并且暴露为模型数据传到视图页面，此方法可实现数据回显效果。
+	controller方法：
+		// 商品修改提交
+		@RequestMapping("/editItemSubmit")
+		public String editItemSubmit(Model model,@ModelAttribute("item") ItemsCustom itemsCustom) throws Exception {
+	jsp页面：
+		<tr>
+			<td>商品名称</td>
+			<td><input type="text" name="name" value="${item.name }"/></td>
+		</tr>
+		<tr>
+			<td>商品价格</td>
+			<td><input type="text" name="price" value="${item.price }"/></td>
+		</tr>
+	如果不用@ModelAttribute也可以使用model.addAttribute("item", itemsCustom)完成数据回显。
+	
+	2).将方法返回值暴露为模型数据传到视图页面
+	被@ModelAttribute注释的方法会在此controller每个方法执行前被执行，因此对于一个controller映射多个URL的用法来说，要谨慎使用。
+	controller方法：
+		//商品分类
+		@ModelAttribute("itemtypes")
+		public Map<String, String> getItemTypes(){
+			Map<String, String> itemTypes = new HashMap<String,String>();
+			itemTypes.put("101", "数码");
+			itemTypes.put("102", "母婴");
+			return itemTypes;
+		}
+	jsp页面页面：
+		<select name="itemtype">
+			<c:forEach items="${itemtypes }" var="itemtype">
+				<option value="${itemtype.key }">${itemtype.value }</option>		
+			</c:forEach>
+		</select>
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+五、异常处理
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+第一步：自定义异常类，继承Exception；
+第二步：定义全局异常处理器，继承springmvc提供的HandlerExceptionResolver接口，重写resolveException方法，返回ModelAndView（包括提示信息和返回地址）；
+第三步：配置全局异常处理器，在springmvc.xml文件中加入
+	<!-- 全局异常处理器
+		  只要实现HandlerExceptionResolver接口就是全局异常处理器 -->
+	<bean class="org.bluesky.ssm.exception.CustomExceptionResolver" />
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+六、文件上传
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+第一步：配置虚拟目录
+在tomcat上配置图片虚拟目录，在tomcat下conf/server.xml中添加：
+	<Context docBase="F:\develop\upload\temp" path="/pic" reloadable="false"/>
+访问http://localhost:8080/pic即可访问F:\develop\upload\temp下的图片。
+也可以通过eclipse配置，点击tomcat管理界面的按钮“Add External Web Module”增加虚拟目录。
+注意：在图片虚拟目录中，一定将图片目录分级创建（提高i/o性能），一般采用按日期(年、月、日)进行分级创建。
+
+第二步：页面的form表单标签中加入多文件类型支持enctype="multipart/form-data"，enctype默认值为enctype="application/x- www-form-urlencoded"，表示不支持文件上传。
+例如：
+	<form id="itemForm" action="${pageContext.request.contextPath }/items/editItemsSubmit.action" method="post" enctype="multipart/form-data">
+	
+第三步：配置multipart类型解析器，在springmvc.xml文件中加入
+	<!-- 文件上传 -->
+	<bean id="multipartResolver"
+		class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+		<!-- 设置上传文件的最大尺寸为5MB -->
+		<property name="maxUploadSize">
+			<value>5242880</value>
+		</property>
+	</bean>
+	
+第四步：增加相关jar包
+	commons-fileupload-1.X.X.jar和commons-io-2.X.jar
+	
+第五步：编写jsp进行图片上传和显示
+	<tr>
+		<td>商品图片</td>
+		<td>
+			<c:if test="${itemsCustom.pic !=null}">
+				<img src="/pic/${itemsCustom.pic}" width=100 height=100 />
+				<br />
+			</c:if>
+			<input type="file" name="items_pic" />
+		</td>
+	</tr>
+	
+第六步：编写control，实现处理文件上传的方法，方法中增加MultipartFile类型参数用于接收图片
+	@RequestMapping("/editItemsSubmit")
+	public String editItemsSubmit(HttpServletRequest request, Integer id, ItemsCustom itemsCustom, MultipartFile items_pic) throws Exception {	
+		// 其它处理逻辑
+		// ... ...
+		
+		// 原始名称
+		String originalFileName = items_pic.getOriginalFilename();
+		// 上传图片
+		if (items_pic != null && originalFileName != null && originalFileName.length() > 0) {
+
+			// 存储图片的物理路径
+			String pic_path = "F:\\develop\\upload\\temp\\";
+			// 新的图片名称（UUID+原始文件名称后缀）
+			String newFileName = UUID.randomUUID() + originalFileName.substring(originalFileName.lastIndexOf("."));
+			// 新图片
+			File newFile = new File(pic_path + newFileName);
+
+			// 将内存中的数据写入磁盘
+			items_pic.transferTo(newFile);
+			// 将新图片名称写到itemsCustom中
+			itemsCustom.setPic(newFileName);
+		}
+		
+		// 调用service更新商品信息，页面需要将商品信息传到此方法
+		itemsService.updateItems(id, itemsCustom);
+
+		return "success";
+	}
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+七、Json数据交互
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+第一步：Springmvc默认用MappingJacksonHttpMessageConverter对json数据进行转换，需要加入jackson的包
+jackson-core-asl-1.9.11.jar
+jackson-mapper-asl-1.9.11.jar
+
+第二步：配置json转换器，在springmvc.xml文件中的注解适配器中加入messageConverters
+	<!--注解适配器 -->
+	<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter">
+		<property name="messageConverters">
+		<list>
+		<bean class="org.springframework.http.converter.json.MappingJacksonHttpMessageConverter"></bean>
+		</list>
+		</property>
+	</bean>
+注意：如果使用<mvc:annotation-driven /> 则不用定义上边的内容。
+
+第三步：编写control
+	// 商品修改提交json信息，响应json信息
+	@RequestMapping("/requestJson")
+	public @ResponseBody ItemsCustom requestJson(@RequestBody ItemsCustom itemsCustom) throws Exception {
+		// 保存修改信息
+		// itemsService.updateItems(itemsCustom);
+		return itemsCustom;
+	}
+	// 商品修改提交，提交普通form表单数据，响应json
+	@RequestMapping("/responseJson")
+	public @ResponseBody ItemsCustom responseJson(ItemsCustom itemsCustom) {
+		// 保存修改信息
+		// itemsService.updateItems(itemsCustom);
+		return itemsCustom;
+	}
+作用：
+@RequestBody注解用于读取http请求的内容(字符串)，通过springmvc提供的HttpMessageConverter接口将读到的内容转换为json、xml等格式的数据并绑定到controller方法的参数上。
+@ResponseBody注解用于将Controller的方法返回的对象，通过HttpMessageConverter接口转换为指定格式的数据如：json,xml等，通过Response响应给客户端。
+
+第四步：编写页面js调用方法
+引入jQuery：<script type="text/javascript" src="${pageContext.request.contextPath }/js/jquery-1.11.3.js"></script>
+js调用方法：
+<script type="text/javascript">
+	function requestJson() {
+		$.ajax({
+			type : 'post',
+			url : '${pageContext.request.contextPath }/requestJson.action',
+			contentType : 'application/json;charset=utf-8',
+			//数据格式是json串，商品信息
+			data : '{"name":"手机","price":999}',
+			success : function(data) {//返回json结果
+				var type = typeof data;
+				if (type == 'object') {
+					alert("商品名称：" + data.name + "\n商品价格：" + data.price)
+				} else {
+					alert("返回数据格式错误！");
+				}
+			}
+		});
+	}
+
+	function responseJson() {
+/* 		$.ajax({
+			type : 'post',
+			url : '${pageContext.request.contextPath }/responseJson.action',
+			// 请求是key/value这里不需要指定contentType，因为默认就 是key/value类型
+			// contentType:'application/json;charset=utf-8',
+			// 数据格式是json串，商品信息
+			data : 'name=手机&price=999',
+			success : function(data) {//返回json结果
+				var type = typeof data;
+				if (type == 'object') {
+					alert("商品名称：" + data.name + "\n商品价格：" + data.price)
+				} else {
+					alert("返回数据格式错误！");
+				}
+			}
+		});
+ */
+		$.post('${pageContext.request.contextPath }/responseJson.action', {
+			name : '手机',
+			price : 999
+		}, function(data) {//返回json结果
+			var type = typeof data;
+			if (type == 'object') {
+				alert("商品名称：" + data.name + "\n商品价格：" + data.price)
+			} else {
+				alert("返回数据格式错误！");
+			}
+		});
+	}
+</script>
+========================================================================================================================================================
+
+
+========================================================================================================================================================
+八、拦截器
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Spring Web MVC的处理器拦截器类似于Servlet开发中的过滤器Filter，用于对处理器进行预处理和后处理。
+
+第一步：拦截器定义，实现HandlerInterceptor接口
+Public class HandlerInterceptor1 implements HandlerInterceptor{
+	/**
+	 * controller执行前调用此方法
+	 * 返回true表示继续执行，返回false中止执行
+	 * 这里可以加入登录校验、权限拦截等
+	 */
+	@Override
+	Public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {}
+	/**
+	 * controller执行后但未返回视图前调用此方法
+	 * 这里可在返回用户前对模型数据进行加工处理，比如这里加入公用信息以便页面显示
+	 */
+	@Override
+	Public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {}
+	/**
+	 * controller执行后且视图返回后调用此方法
+	 * 这里可得到执行controller时的异常信息
+	 * 这里可记录操作日志，资源清理等
+	 */
+	@Override
+	Public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {}
+}
+
+第二步：拦截器配置
+1.针对某种mapping配置拦截器，一般不推荐使用
+	<bean class="org.springframework.web.servlet.handler.BeanNameUrlHandlerMapping">
+		<property name="interceptors">
+			<list>
+				<ref bean="handlerInterceptor1"/>
+				<ref bean="handlerInterceptor2"/>
+			</list>
+		</property>
+	</bean>
+	<bean id="handlerInterceptor1" class="org.bluesky.ssm.interceptor.HandlerInterceptor1"/>
+	<bean id="handlerInterceptor2" class="org.bluesky.ssm.interceptor.HandlerInterceptor2"/>
+2.针对所有mapping配置全局拦截器
+	<!-- 拦截器 -->
+	<mvc:interceptors>
+		<!-- 多个拦截器,顺序执行 -->
+		<!-- 登陆认证拦截器 -->
+		<mvc:interceptor>
+			<!-- /**表示所有url包括子url路径 -->
+			<mvc:mapping path="/**" />
+			<bean class="org.bluesky.ssm.interceptor.HandlerInterceptor1"></bean>
+		</mvc:interceptor>
+		<mvc:interceptor>
+			<mvc:mapping path="/**" />
+			<bean class="org.bluesky.ssm.interceptor.HandlerInterceptor1"></bean>
+		</mvc:interceptor>
+	</mvc:interceptors>
+
+执行顺序：
+1.拦截器1、拦截器2都放行的情况下：
+HandlerInterceptor1...preHandle
+HandlerInterceptor2...preHandle
+HandlerInterceptor2...postHandle
+HandlerInterceptor1...postHandle
+HandlerInterceptor2...afterCompletion
+HandlerInterceptor1...afterCompletion
+2.拦截器1放行，拦截器2不放行的情况下：
+HandlerInterceptor1...preHandle
+HandlerInterceptor2...preHandle
+HandlerInterceptor1...afterCompletion
+3.拦截器1不放行，拦截器2放行/不放行的情况下：
+HandlerInterceptor1...preHandle
+
+总结：
+统一日志处理拦截器，需要该拦截器preHandle一定要放行，且将它放在拦截器链接中第一个位置。
+登陆认证拦截器，放在拦截器链接中第一个位置。权限校验拦截器，放在登陆认证拦截器之后。（因为登陆通过后才校验权限）
+========================================================================================================================================================

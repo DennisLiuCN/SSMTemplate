@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE generatorConfiguration
+  PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN"
+  "http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+
+<generatorConfiguration>
+	<!-- 数据库驱动位置：绝对路径 -->
+	<classPathEntry location="D:\Maven\repository\mysql\mysql-connector-java\5.1.35\mysql-connector-java-5.1.35.jar" />
+	
+	<!-- context：用于指定生成一组对象的环境，例如指定要连接的数据库，要生成对象的类型和要处理的数据库中的表。运行MBG的时候还可以指定要运行的<context>
+		argetRuntime：此属性用于指定生成的代码的运行时环境
+		该属性支持以下可选值：MyBatis3(默认值)，MyBatis3Simple，Ibatis2Java2，Ibatis2Java5 -->
+	<context id="SSMTemplate" targetRuntime="MyBatis3">
+		<commentGenerator>
+			<!-- 是否去除自动生成的注释：true是；false否 -->
+			<property name="suppressAllComments" value="true" />
+			<!-- When the property is true, no timestamp will be added to the generated comments -->
+			<property name="suppressDate" value="true" />
+		</commentGenerator>
+		
+		<!--数据库连接的信息：驱动类、连接地址、用户名、密码 -->
+		<jdbcConnection driverClass="com.mysql.jdbc.Driver" connectionURL="jdbc:mysql://localhost:3306/mybatis" userId="hello" password="111111" />
+		<!--
+		<jdbcConnection driverClass="oracle.jdbc.OracleDriver" connectionURL="jdbc:oracle:thin:@127.0.0.1:1521:yycg" userId="yycg" password="yycg" />
+		-->
+
+		<!-- 默认false，把JDBC DECIMAL 和 NUMERIC 类型解析为 Integer，为 true时把JDBC DECIMAL 和 
+			NUMERIC 类型解析为java.math.BigDecimal -->
+		<javaTypeResolver>
+			<property name="forceBigDecimals" value="false" />
+		</javaTypeResolver>
+
+		<!-- targetProject：生成PO类的位置 -->
+		<javaModelGenerator targetPackage="org.bluesky.ssm.po.auto" targetProject="SSMTemplate/src/main/java">
+			<!-- enableSubPackages：是否让schema作为包的后缀 -->
+			<property name="enableSubPackages" value="false" />
+			<!-- 从数据库返回的值被清理前后的空格 -->
+			<property name="trimStrings" value="true" />
+		</javaModelGenerator>
+        <!-- targetProject：mapper映射文件生成的位置 -->
+		<sqlMapGenerator targetPackage="org.bluesky.ssm.mapper.auto"  targetProject="SSMTemplate/src/main/java">
+			<!-- enableSubPackages：是否让schema作为包的后缀 -->
+			<property name="enableSubPackages" value="false" />
+		</sqlMapGenerator>
+		<!-- targetPackage：mapper接口生成的位置 -->
+		<javaClientGenerator targetPackage="org.bluesky.ssm.dao.auto"  targetProject="SSMTemplate/src/main/java" type="XMLMAPPER">
+			<!-- enableSubPackages：是否让schema作为包的后缀 -->
+			<property name="enableSubPackages" value="false" />
+		</javaClientGenerator>
+		
+		<!-- 全部数据库表 -->
+		<table tableName="%" />
+		<!-- 指定数据库表 -->
+		<!-- 
+		<table tableName="items"></table>
+		<table tableName="orders"></table>
+		<table tableName="orderdetail"></table>
+		<table tableName="user"></table>
+		-->
+		
+		<!-- 有些表的字段需要指定java类型
+		<table schema="" tableName="">
+			<columnOverride column="" javaType="" />
+		</table>
+		-->
+	</context>
+</generatorConfiguration>

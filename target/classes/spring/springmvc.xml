@@ -1,0 +1,189 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd 
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.2.xsd 
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-3.2.xsd">
+
+	<context:component-scan base-package="org.bluesky.ssm.controller" />
+	
+	<mvc:annotation-driven conversion-service="conversionService" />
+	
+	<bean id="conversionService" class="org.springframework.format.support.FormattingConversionServiceFactoryBean">
+		<property name="converters">
+			<list>
+				<bean class="org.bluesky.ssm.controller.converter.CustomDateConverter"/>
+			</list>
+		</property>
+	</bean>
+	
+	<!-- InternalResourceViewResolver视图解析 -->
+	<!-- 注意：InternalResourceViewResolver这种能解析所有的视图，即永远能返回一个非空View对象的ViewResolver一定要把它放在ViewResolver链的最后面 -->
+	<bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="viewClass" value="org.springframework.web.servlet.view.JstlView"/>
+		<property name="prefix" value="/WEB-INF/jsp/" />
+		<property name="suffix" value=".jsp" />
+    	<property name="order" value="1" />
+	</bean>
+	
+<!--============================================================================================================================================-->
+<!--============================================以下配置内容在springmvc_base.xml文件中没有，为新增内容============================================-->
+	
+	<!-- 全局异常处理器
+		  只要实现HandlerExceptionResolver接口就是全局异常处理器 -->
+	<bean class="org.bluesky.ssm.exception.CustomExceptionResolver" />
+	
+	
+	<!-- 文件上传 -->
+	<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver" p:defaultEncoding="utf-8">
+		<!-- 解析文件错误时抛异常 -->
+		<property name="resolveLazily" value="true" />
+		<!-- 设置上传文件的最大尺寸，单位是Byte -->
+		<property name="maxUploadSize">
+			<value>5242880</value>
+		</property>
+	</bean>
+	
+	
+	<!-- json数据交互 -->
+	<!-- 注解适配器
+		  如果使用<mvc:annotation-driven /> 则不用定义下边的内容 -->
+	<!--
+	<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter">
+		<property name="messageConverters">
+			<list>
+				<bean class="org.springframework.http.converter.json.MappingJacksonHttpMessageConverter"></bean>
+			</list>
+		</property>
+	</bean>
+	-->
+	
+	
+	<!-- 拦截器 -->
+	<mvc:interceptors>
+		<!-- 多个拦截器,顺序执行 -->
+		<!-- 日志拦截器 -->
+		<mvc:interceptor>
+			<!-- /**表示所有url包括子url路径 -->
+			<mvc:mapping path="/**" />
+			<!-- 过滤静态资源 -->
+			<mvc:exclude-mapping path="/main/**"/>
+			<mvc:exclude-mapping path="/js/**"/>
+			<mvc:exclude-mapping path="/jquery/**"/>
+			<mvc:exclude-mapping path="/css/**"/>
+			<mvc:exclude-mapping path="/images/**"/>
+			<mvc:exclude-mapping path="/assets/**"/>
+			<bean class="org.bluesky.ssm.interceptor.LoggerInterceptor"></bean>
+		</mvc:interceptor>
+		<!-- 登陆认证拦截器 -->
+		<mvc:interceptor>
+			<mvc:mapping path="/**" />
+			<mvc:exclude-mapping path="/main/**"/>
+			<mvc:exclude-mapping path="/js/**"/>
+			<mvc:exclude-mapping path="/jquery/**"/>
+			<mvc:exclude-mapping path="/css/**"/>
+			<mvc:exclude-mapping path="/images/**"/>
+			<mvc:exclude-mapping path="/assets/**"/>
+			<bean class="org.bluesky.ssm.interceptor.LoginInterceptor"></bean>
+		</mvc:interceptor>
+	</mvc:interceptors>
+	
+	
+	<!-- Spring MVC对静态资源的处理 -->
+	<!-- web.xml把Spring MVC前端控制器访问路径设置为“/”时，Spring MVC将捕获Web容器所有的请求，包括静态资源的请求，对于静态文件的解析需要配置不让DispatcherServlet进行解析 -->
+	<!-- 1.<mvc:resources>方式
+		  需要配置<mvc:annotation-driven />
+		 /js/**映射到ResourceHttpRequestHandler进行处理，location指定静态资源的位置，可以是web application根目录下、jar包里面，这样可以把静态资源压缩到jar包中。
+		 cache-period可以使得静态资源进行web cache
+		  使用<mvc:resources/>元素，把mapping的URI注册到SimpleUrlHandlerMapping的urlMap中，key为mapping的URI pattern值，而value为ResourceHttpRequestHandler，这样就巧妙的把对静态资源的访问由HandlerMapping转到ResourceHttpRequestHandler处理并返回，所以就支持classpath目录，jar包内静态资源的访问。
+		  另外需要注意的一点是，不要对SimpleUrlHandlerMapping设置defaultHandler，因为对static uri的defaultHandler就是ResourceHttpRequestHandler，否则无法处理static resources request。 -->
+	<!-- 该种配置方式在Spring新版本中会报错误：
+		 org.springframework.core.convert.ConversionFailedException: Failed to convert from type java.util.ArrayList<?> to type java.util.List<org.springframework.core.io.Resource> for value '[/main/]';
+		 解决方式为：
+		 @EnableWebMvc
+		 @Configuration
+		 public class WebConfig extends WebMvcConfigurerAdapter {
+		   @Override
+		   public void addResourceHandlers(ResourceHandlerRegistry registry) {
+		     registry.addResourceHandler("/resources/**").addResourceLocations("/test");
+		   }
+		 }
+	 -->
+	<!-- 	
+	<mvc:resources mapping="/main/**" location="/main/" />
+	<mvc:resources mapping="/js/**" location="/js/" />
+	<mvc:resources mapping="/jquery/**" location="/jquery/" />
+	<mvc:resources mapping="/css/**" location="/css/" />
+	<mvc:resources mapping="/images/**" location="/images/" />
+	<mvc:resources mapping="/index.jsp" location="/index.jsp" />
+	 --> 
+	<!-- 2.使用Servlet容器自己的默认Servlet
+		  把"/**"url，注册到SimpleUrlHandlerMapping的urlMap中，把对静态资源的访问由HandlerMapping转到org.springframework.web.servlet.resource.DefaultServletHttpRequestHandler处理并返回。
+		 DefaultServletHttpRequestHandler使用就是各个Servlet容器自己的默认Servlet -->
+	<mvc:default-servlet-handler />
+	<!-- 补充说明：
+		  多个HandlerMapping的执行顺序问题：
+		     DefaultAnnotationHandlerMapping的order属性值是：0
+		     <mvc:resources/>自动注册的SimpleUrlHandlerMapping的order属性值是：2147483646
+		     <mvc:default-servlet-handler/>自动注册的SimpleUrlHandlerMapping的order属性值是：2147483647
+		     spring会先执行order值比较小的。当访问一个a.jpg图片文件时，先通过DefaultAnnotationHandlerMapping来找处理器，一定是找不到的，我们没有叫a.jpg的Action。再按order值升序找，由于最后一个SimpleUrlHandlerMapping是匹配"/**"的，所以一定会匹配上，再响应图片。
+		     Spring MVC中，访问静态资源，还要走层层匹配，性能肯定好不到哪里去。不仅仅是Spring MVC，即便Struts，它们毕竟存活于servlet容器，只要由servlet容器处理这些静态资源，必然要将这些资源读入JVM的内存区中。所以处理静态资源，通常会在前端加Apache或nginx。
+		  如果DispatcherServlet拦截 *.do或*.action这样的URL，就不存上述问题 -->
+ 	
+ 	
+ 	<!-- 设置欢迎界面 -->
+	<!-- 1.重定向
+		  如果当前访问路径是/，则重定向到/login.action -->
+	<!-- <mvc:view-controller path="/" view-name="redirect:/loginout/login" /> -->
+	<!-- 2.页面跳转
+		  如果当前访问路径是/，则跳转到到/WEB-INF/jsp/items/itemsList.jsp -->
+	<!-- <mvc:view-controller path="/" view-name="items/itemsList" /> -->
+	<!-- 注意：此设置经常不起作用，通常在Controller类中配置对“/”的映射路径 -->
+	
+	
+	<!-- Freemarker配置 -->
+    <bean id="freemarkerConfig" class="org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer">
+        <property name="templateLoaderPath" value="/WEB-INF/view/" />
+		<property name="freemarkerSettings">                            <!-- 设置FreeMarker环境属性 -->
+			<props>
+				<prop key="template_update_delay">3</prop>              <!-- 刷新模板的周期，单位为秒 -->
+				<prop key="locale">zh_CN</prop>                         <!-- 本地化设置 -->
+				<prop key="default_encoding">UTF-8</prop>
+				<prop key="datetime_format">yyyy-MM-dd HH:mm:ss</prop>
+				<prop key="date_format">yyyy-MM-dd</prop>
+				<prop key="number_format">#.##</prop>
+				<prop key="classic_compatible">true</prop>
+                <prop key="template_exception_handler">ignore</prop>
+                <!-- Spring整合FreeMarker本地化动态设置
+                	  另一种配置方式：ftl模板文件中引入<#import "/common/spring.ftl" as spring/>
+                	 ftl模板文件中使用<@spring.message "welcome"/> -->
+                <prop key="auto_import">common/spring.ftl as spring</prop>
+			</props>
+		</property>
+		<property name="freemarkerVariables">
+            <map>
+                <entry key="xml_escape" value-ref="fmXmlEscape" />
+                <entry key="ellipsis" value-ref="ellipsis" /><!-- 配置自定义指令，ftl模板文件中使用<@ellipsis text="0123456789" length="6"></@ellipsis> -->
+            </map>
+        </property>
+	</bean>
+	<bean id="fmXmlEscape" class="freemarker.template.utility.XmlEscape" />
+	<bean id="ellipsis" class="org.bluesky.ssm.freemarker.EllipsisDirective" />
+	<!-- FreeMarker视图解析 -->
+	<bean id="viewResolver" class="org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver">
+		<property name="viewClass" value="org.springframework.web.servlet.view.freemarker.FreeMarkerView" />
+		<property name="cache" value="true" />
+		<!-- <property name="prefix" value="/WEB-INF/view/" /> -->            <!-- Freemarker配置中已经配置该属性，否则会报找不到试图 -->
+		<property name="suffix" value=".ftl" />
+		<property name="contentType" value="text/html;charset=UTF-8" />
+		<property name="requestContextAttribute" value="request" />
+		<property name="exposeRequestAttributes" value="true" />
+		<property name="exposeSessionAttributes" value="true" />
+		<property name="exposeSpringMacroHelpers" value="true" />
+    	<property name="order" value="0" />                                   <!-- 给试图解析器配置优先级 -->
+	</bean>
+
+</beans>
